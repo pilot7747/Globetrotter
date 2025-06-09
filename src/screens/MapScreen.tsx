@@ -15,6 +15,10 @@ const MapScreen = () => {
     try {
       setIsLoading(true);
       const savedLocations = await LocationStorage.loadLocations();
+      console.log('=== MAPSCREEN DEBUG ===');
+      console.log('Loaded locations from storage:', savedLocations);
+      console.log('Number of locations:', savedLocations.length);
+      console.log('=====================');
       setLocations(savedLocations);
     } catch (error) {
       console.error('Error loading locations:', error);

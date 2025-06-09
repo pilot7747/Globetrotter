@@ -37,7 +37,7 @@ const MapScreen = () => {
         isLoading={isLoading}
       />
       <FAB
-        icon="add"
+        icon="plus"
         style={styles.fab}
         onPress={() => navigation.navigate('AddLocation' as never)}
         size="medium"

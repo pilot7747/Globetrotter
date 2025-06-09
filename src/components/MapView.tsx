@@ -158,45 +158,91 @@ const MapViewComponent: React.FC<MapViewProps> = ({
             var locations = ${JSON.stringify(locations)};
             var visitedCountries = ${JSON.stringify(visitedCountries)};
             
-            // Country name mappings for the API
+            // Country name mappings for proper matching
             var countryMappings = {
                 'United States': 'United States of America',
+                'US': 'United States of America',
+                'USA': 'United States of America',
                 'UK': 'United Kingdom',
-                'United Kingdom': 'United Kingdom'
+                'Britain': 'United Kingdom',
+                'Russia': 'Russian Federation',
+                'South Korea': 'Republic of Korea',
+                'North Korea': 'Democratic People\\'s Republic of Korea',
+                'Czech Republic': 'Czechia',
+                'Macedonia': 'North Macedonia'
             };
             
-            // Function to get proper country name for API
-            function getCountryName(country) {
+            // Function to normalize country names
+            function normalizeCountryName(country) {
                 return countryMappings[country] || country;
             }
             
-            // Load and highlight visited countries
+            // Load and highlight visited countries with proper polygons
             async function loadCountryPolygons() {
-                for (let country of visitedCountries) {
-                    try {
-                        const countryName = getCountryName(country);
-                        const response = await fetch(\`https://restcountries.com/v3.1/name/\${encodeURIComponent(countryName)}?fullText=true\`);
-                        
-                        if (response.ok) {
-                            const countryData = await response.json();
-                            if (countryData[0] && countryData[0].latlng) {
-                                // For now, add a circle around the country center as a placeholder
-                                // Real country borders would require a different GeoJSON API
-                                const [lat, lng] = countryData[0].latlng;
-                                
-                                L.circle([lat, lng], {
-                                    color: '#007AFF',
-                                    fillColor: '#007AFF',
-                                    fillOpacity: 0.15,
-                                    radius: 200000, // 200km radius
-                                    weight: 2,
-                                    opacity: 0.6
-                                }).addTo(map);
-                            }
-                        }
-                    } catch (error) {
-                        console.log('Could not load country data for:', country);
+                try {
+                    console.log('Loading country polygons...');
+                    
+                    // Load the countries GeoJSON from Natural Earth via CDN
+                    const response = await fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson');
+                    
+                    if (!response.ok) {
+                        throw new Error('Failed to load country data');
                     }
+                    
+                    const countriesData = await response.json();
+                    console.log('Loaded', countriesData.features.length, 'countries');
+                    
+                    // Create a set of normalized visited countries for quick lookup
+                    const normalizedVisitedCountries = new Set(
+                        visitedCountries.map(country => normalizeCountryName(country).toLowerCase())
+                    );
+                    
+                    // Add country polygons for visited countries
+                    countriesData.features.forEach(function(country) {
+                        const countryName = country.properties.name || country.properties.ADMIN || country.properties.NAME;
+                        
+                        if (countryName && normalizedVisitedCountries.has(countryName.toLowerCase())) {
+                            // Style for visited countries
+                            const countryStyle = {
+                                fillColor: '#007AFF',
+                                weight: 2,
+                                opacity: 0.8,
+                                color: '#0051D5',
+                                fillOpacity: 0.2,
+                                interactive: false
+                            };
+                            
+                            // Add the country polygon to the map
+                            L.geoJSON(country, {
+                                style: countryStyle
+                            }).addTo(map);
+                            
+                            console.log('Highlighted country:', countryName);
+                        }
+                    });
+                    
+                } catch (error) {
+                    console.error('Error loading country polygons:', error);
+                    console.log('Falling back to basic highlighting');
+                    
+                    // Fallback: simple circles if GeoJSON fails
+                    visitedCountries.forEach(function(country) {
+                        // Add a simple circle as fallback
+                        const countryLocations = locations.filter(loc => loc.country === country);
+                        if (countryLocations.length > 0) {
+                            const centerLat = countryLocations.reduce((sum, loc) => sum + loc.coordinates.latitude, 0) / countryLocations.length;
+                            const centerLng = countryLocations.reduce((sum, loc) => sum + loc.coordinates.longitude, 0) / countryLocations.length;
+                            
+                            L.circle([centerLat, centerLng], {
+                                color: '#007AFF',
+                                fillColor: '#007AFF',
+                                fillOpacity: 0.15,
+                                radius: 150000,
+                                weight: 2,
+                                opacity: 0.6
+                            }).addTo(map);
+                        }
+                    });
                 }
             }
             

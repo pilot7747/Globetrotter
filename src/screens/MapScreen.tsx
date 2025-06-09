@@ -37,11 +37,9 @@ const MapScreen = () => {
         isLoading={isLoading}
       />
       <FAB
-        icon="plus"
+        icon="add"
         style={styles.fab}
         onPress={() => navigation.navigate('AddLocation' as never)}
-        label="Add Visit"
-        mode="flat"
         size="medium"
       />
     </View>
@@ -55,16 +53,10 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    margin: 20,
-    right: 0,
-    bottom: 100, // Moved up to avoid tab bar
+    right: 20,
+    bottom: 120,
     backgroundColor: '#007AFF',
-    borderRadius: 16,
-    elevation: 8,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
+    borderRadius: 28,
   },
 });
 

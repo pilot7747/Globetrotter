@@ -150,7 +150,7 @@ const AddLocationScreen = () => {
         <View style={styles.selectedLocationContainer}>
           <Title style={styles.selectedLocationTitle}>Selected Location:</Title>
           <Chip 
-            icon="map-marker" 
+            icon="location-on" 
             mode="outlined"
             style={styles.locationChip}
           >
@@ -232,8 +232,8 @@ const AddLocationScreen = () => {
       {/* Show coordinates if available */}
       {formData.coordinates && formData.coordinates.latitude !== 0 && (
         <View style={styles.coordinatesContainer}>
-          <Chip icon="crosshairs-gps" mode="outlined">
-            📍 {formData.coordinates.latitude.toFixed(4)}, {formData.coordinates.longitude.toFixed(4)}
+          <Chip icon="my-location" mode="outlined">
+            {formData.coordinates.latitude.toFixed(4)}, {formData.coordinates.longitude.toFixed(4)}
           </Chip>
         </View>
       )}
@@ -251,7 +251,7 @@ const AddLocationScreen = () => {
 
       {/* Instructions */}
       <View style={styles.instructionsContainer}>
-        <Title style={styles.instructionsTitle}>💡 How to use:</Title>
+        <Title style={styles.instructionsTitle}>How to use:</Title>
         <TextInput
           mode="outlined"
           value="1. Search for your location (e.g., 'Berlin', 'Paris', 'Tokyo')
@@ -271,75 +271,99 @@ const AddLocationScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#fff',
+    padding: 20,
+    backgroundColor: '#F8F9FA',
   },
   title: {
-    fontSize: 24,
-    marginBottom: 20,
+    fontSize: 28,
+    marginBottom: 24,
     textAlign: 'center',
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: '#1A1A1A',
   },
   quickActions: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   quickButton: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   autocompleteContainer: {
-    marginBottom: 20,
+    marginBottom: 24,
     zIndex: 1000,
   },
   selectedLocationContainer: {
-    marginBottom: 20,
-    padding: 16,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
+    marginBottom: 24,
+    padding: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: '#E3F2FD',
   },
   selectedLocationTitle: {
-    fontSize: 16,
-    marginBottom: 8,
-    color: '#495057',
+    fontSize: 18,
+    marginBottom: 12,
+    color: '#1A1A1A',
+    fontWeight: '600',
   },
   locationChip: {
     alignSelf: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 16,
+    backgroundColor: '#E3F2FD',
   },
   locationDetails: {
-    gap: 12,
+    gap: 16,
   },
   input: {
-    marginBottom: 16,
-    backgroundColor: '#fff',
+    marginBottom: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
   },
   coordinatesContainer: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   submitButton: {
-    marginTop: 8,
-    marginBottom: 24,
-    backgroundColor: '#2196F3',
-    paddingVertical: 4,
+    marginTop: 12,
+    marginBottom: 32,
+    backgroundColor: '#007AFF',
+    paddingVertical: 8,
+    borderRadius: 12,
+    elevation: 4,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   instructionsContainer: {
-    marginBottom: 20,
-    padding: 16,
-    backgroundColor: '#e3f2fd',
-    borderRadius: 8,
+    marginBottom: 24,
+    padding: 20,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#bbdefb',
+    borderColor: '#BBDEFB',
   },
   instructionsTitle: {
-    fontSize: 16,
-    marginBottom: 8,
-    color: '#1976d2',
+    fontSize: 18,
+    marginBottom: 12,
+    color: '#007AFF',
+    fontWeight: '600',
   },
   instructions: {
     backgroundColor: 'transparent',
-    fontSize: 14,
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#1A1A1A',
   },
 });
 

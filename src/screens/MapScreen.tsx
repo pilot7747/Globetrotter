@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 120,
+    bottom: 30,
     backgroundColor: '#007AFF',
     borderRadius: 28,
   },

@@ -180,11 +180,11 @@ const MapViewComponent: React.FC<MapViewProps> = ({
                 
                 // Custom marker icon
                 var visitedIcon = L.divIcon({
-                    html: '<div style="width: 20px; height: 20px; background: #007AFF; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,122,255,0.4);"></div>',
+                    html: '<div style="width: 12px; height: 12px; background: #007AFF; border: 2px solid white; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,122,255,0.3);"></div>',
                     className: 'custom-marker',
-                    iconSize: [20, 20],
-                    iconAnchor: [10, 10],
-                    popupAnchor: [0, -10]
+                    iconSize: [12, 12],
+                    iconAnchor: [6, 6],
+                    popupAnchor: [0, -6]
                 });
                 
                 var locations = ${JSON.stringify(locations)};
@@ -198,6 +198,93 @@ const MapViewComponent: React.FC<MapViewProps> = ({
                 console.log('Visited countries:', visitedCountries);
                 console.log('Visited regions:', visitedRegions);
                 console.log('========================');
+                
+                // Smart country name normalization
+                function normalizeCountryName(name) {
+                    if (!name) return '';
+                    
+                    const normalized = name.toLowerCase().trim();
+                    
+                    // Common country name mappings
+                    const countryMappings = {
+                        // Balkan countries
+                        'serbia': 'republic of serbia',
+                        'republic of serbia': 'serbia',
+                        
+                        // Major powers
+                        'usa': 'united states',
+                        'united states': 'united states of america',
+                        'united states of america': 'usa',
+                        'america': 'united states',
+                        
+                        'uk': 'united kingdom',
+                        'united kingdom': 'britain',
+                        'britain': 'united kingdom',
+                        'great britain': 'united kingdom',
+                        
+                        'russia': 'russian federation',
+                        'russian federation': 'russia',
+                        
+                        // European countries
+                        'czechia': 'czech republic',
+                        'czech republic': 'czechia',
+                        
+                        // Asian countries
+                        'south korea': 'republic of korea',
+                        'republic of korea': 'south korea',
+                        'north korea': 'democratic people\\'s republic of korea',
+                        
+                        // Middle East
+                        'iran': 'islamic republic of iran',
+                        'islamic republic of iran': 'iran',
+                        
+                        // Africa
+                        'congo': 'democratic republic of the congo',
+                        'drc': 'democratic republic of the congo',
+                        
+                        // Others
+                        'vatican': 'vatican city',
+                        'vatican city': 'holy see',
+                    };
+                    
+                    return countryMappings[normalized] || normalized;
+                }
+                
+                // Check if country names match (with normalization)
+                function countriesMatch(name1, name2) {
+                    if (!name1 || !name2) return false;
+                    
+                    const norm1 = normalizeCountryName(name1);
+                    const norm2 = normalizeCountryName(name2);
+                    
+                    // Debug suspicious matches
+                    if ((name1.toLowerCase().includes('romania') && name2.toLowerCase().includes('oman')) ||
+                        (name2.toLowerCase().includes('romania') && name1.toLowerCase().includes('oman'))) {
+                        console.log('🐛 DEBUGGING Romania/Oman:', name1, '<->', name2, 'norm1:', norm1, 'norm2:', norm2);
+                    }
+                    
+                    // Direct match
+                    if (norm1 === norm2) return true;
+                    
+                    // Cross-check both directions
+                    if (normalizeCountryName(norm1) === norm2) return true;
+                    if (normalizeCountryName(norm2) === norm1) return true;
+                    
+                    // Check if one contains the other (for cases like "United States" vs "United States of America")
+                    // BUT make sure it's not a false positive like Romania containing Oman
+                    if (norm1.includes(norm2) && norm2.length >= 4) {
+                        // Additional safety check
+                        if (norm2 === 'oman' && norm1 === 'romania') return false;
+                        return true;
+                    }
+                    if (norm2.includes(norm1) && norm1.length >= 4) {
+                        // Additional safety check  
+                        if (norm1 === 'oman' && norm2 === 'romania') return false;
+                        return true;
+                    }
+                    
+                    return false;
+                }
                 
                 // Load and highlight visited countries and regions
                 async function loadPolygons() {
@@ -213,6 +300,19 @@ const MapViewComponent: React.FC<MapViewProps> = ({
                         if (countriesResponse.ok) {
                             const countriesData = await countriesResponse.json();
                             console.log('Loaded', countriesData.features.length, 'countries');
+                            
+                            // Debug: look for Serbia specifically in GeoJSON
+                            console.log('Looking for Serbia in GeoJSON...');
+                            countriesData.features.forEach(function(country, index) {
+                                const countryName = country.properties.name || 
+                                                  country.properties.ADMIN || 
+                                                  country.properties.NAME ||
+                                                  country.properties.NAME_EN ||
+                                                  country.properties.name_en;
+                                if (countryName && countryName.toLowerCase().includes('serb')) {
+                                    console.log('Found Serbia-related country:', countryName, 'Properties:', JSON.stringify(country.properties));
+                                }
+                            });
                             
                             // Debug: show first few country names from GeoJSON
                             console.log('Sample country names from GeoJSON:');
@@ -245,9 +345,7 @@ const MapViewComponent: React.FC<MapViewProps> = ({
                                 // Simple exact matching - no fuzzy logic
                                 let isVisited = false;
                                 for (let visitedCountry of visitedCountries) {
-                                    if (countryName === visitedCountry || 
-                                        countryName === visitedCountry.trim() ||
-                                        visitedCountry === countryName.trim()) {
+                                    if (countriesMatch(countryName, visitedCountry)) {
                                         isVisited = true;
                                         console.log('✅ Exact match found:', visitedCountry, '<->', countryName);
                                         break;
@@ -276,82 +374,6 @@ const MapViewComponent: React.FC<MapViewProps> = ({
                             });
                             
                             console.log('Total countries highlighted:', countriesHighlighted);
-                        }
-                        
-                        // Load regions/states/provinces if we have any visited regions
-                        if (visitedRegions.length > 0) {
-                            console.log('Loading admin-1 boundaries for regions...');
-                            
-                            // Use working admin-1 data sources that actually exist
-                            const admin1Sources = [
-                                'https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_admin_1_states_provinces_shp.geojson', // geojson.xyz confirmed working
-                                'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_1_states_provinces_shp.geojson' // Natural Earth direct
-                            ];
-                            
-                            for (let sourceUrl of admin1Sources) {
-                                try {
-                                    console.log('Trying admin-1 source:', sourceUrl);
-                                    const admin1Response = await fetch(sourceUrl);
-                                    
-                                    if (admin1Response.ok) {
-                                        const admin1Data = await admin1Response.json();
-                                        console.log('✅ Loaded', admin1Data.features.length, 'admin-1 regions from', sourceUrl);
-                                        
-                                        // Debug: log first few features to understand structure
-                                        if (admin1Data.features.length > 0) {
-                                            console.log('Sample admin-1 feature properties:', admin1Data.features[0].properties);
-                                        }
-                                        
-                                        let regionsHighlighted = 0;
-                                        
-                                        // Process visited regions
-                                        admin1Data.features.forEach(function(region) {
-                                            // Try multiple property names for region name
-                                            const regionName = region.properties.name || 
-                                                             region.properties.NAME || 
-                                                             region.properties.NAME_1 || 
-                                                             region.properties.name_en ||
-                                                             region.properties.NAME_EN;
-                                            
-                                            // Try multiple property names for country
-                                            const countryName = region.properties.admin || 
-                                                              region.properties.ADMIN || 
-                                                              region.properties.NAME_0 ||
-                                                              region.properties.admin_0 ||
-                                                              region.properties.country;
-                                            
-                                            if (regionName && countryName && isRegionVisited(regionName, countryName)) {
-                                                // Style for visited regions (different color than countries)
-                                                const regionStyle = {
-                                                    fillColor: '#34C759',
-                                                    weight: 2,
-                                                    opacity: 0.8,
-                                                    color: '#28A745',
-                                                    fillOpacity: 0.25,
-                                                    interactive: false
-                                                };
-                                                
-                                                // Add the region polygon to the map
-                                                L.geoJSON(region, {
-                                                    style: regionStyle
-                                                }).addTo(map);
-                                                
-                                                console.log('✅ Highlighted region:', regionName + ', ' + countryName);
-                                                regionsHighlighted++;
-                                            }
-                                        });
-                                        
-                                        console.log('Total regions highlighted:', regionsHighlighted);
-                                        
-                                        if (regionsHighlighted > 0) {
-                                            break; // Successfully highlighted regions, no need to try other sources
-                                        }
-                                    }
-                                } catch (error) {
-                                    console.log('Failed to load from', sourceUrl, '- trying next source');
-                                    console.error(error);
-                                }
-                            }
                         }
                         
                     } catch (error) {
@@ -459,6 +481,8 @@ const MapViewComponent: React.FC<MapViewProps> = ({
                 loadPolygons();
                 
                 console.log('Map loaded with', locations.length, 'locations');
+
+                console.log('🔧 Country normalization functions loaded successfully!');
             } catch (error) {
                 console.error('Error in WebView script initialization:', error);
                 console.error('Error stack:', error.stack);

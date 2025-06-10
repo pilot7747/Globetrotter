@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, Alert } from 'react-native';
-import { TextInput, Button, Title, Chip } from 'react-native-paper';
+import { TextInput, Button, Title, Chip, Snackbar } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { Location } from '../types';
 import { getCurrentLocation, reverseGeocode, type LocationSuggestion } from '../utils/locationUtils';
 import { LocationStorage } from '../utils/locationStorage';
@@ -11,6 +11,9 @@ import LocationAutocomplete from '../components/LocationAutocomplete';
 
 const AddLocationScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute();
+  const editLocation = (route.params as any)?.editLocation as Location | undefined;
+  const isEditing = !!editLocation;
   const [formData, setFormData] = useState<Partial<Location>>({
     country: '',
     region: '',
@@ -27,6 +30,26 @@ const AddLocationScreen = () => {
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<LocationSuggestion | null>(null);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  // Pre-fill form when editing
+  useEffect(() => {
+    if (isEditing && editLocation) {
+      setFormData(editLocation);
+      setPhotoUri(editLocation.photoUri);
+      setSelectedLocation({
+        id: editLocation.id,
+        city: editLocation.city || '',
+        region: editLocation.region || '',
+        country: editLocation.country,
+        coordinates: editLocation.coordinates,
+        displayName: editLocation.city ? 
+          `${editLocation.city}, ${editLocation.country}` : 
+          editLocation.country
+      });
+    }
+  }, [isEditing, editLocation]);
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
@@ -94,23 +117,39 @@ const AddLocationScreen = () => {
 
     setIsSaving(true);
     try {
-      // Generate ID for the location
-      const newLocation: Location = {
-        ...formData,
-        id: Date.now().toString(),
-        country: formData.country!,
-        visitDate: formData.visitDate || new Date(),
-        coordinates: formData.coordinates!,
-      } as Location;
+      if (isEditing && editLocation) {
+        // Update existing location
+        const updatedLocation: Location = {
+          ...formData,
+          id: editLocation.id,
+          country: formData.country!,
+          visitDate: formData.visitDate || new Date(),
+          coordinates: formData.coordinates!,
+        } as Location;
 
-      // Save to storage
-      await LocationStorage.addLocation(newLocation);
-      
-      Alert.alert(
-        'Success!', 
-        'Location added to your travel log.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+        await LocationStorage.updateLocation(editLocation.id, updatedLocation);
+        
+        // Show success snackbar and navigate back
+        setSnackbarMessage('Location updated successfully! 🎉');
+        setSnackbarVisible(true);
+        navigation.goBack();
+      } else {
+        // Add new location
+        const newLocation: Location = {
+          ...formData,
+          id: Date.now().toString(),
+          country: formData.country!,
+          visitDate: formData.visitDate || new Date(),
+          coordinates: formData.coordinates!,
+        } as Location;
+
+        await LocationStorage.addLocation(newLocation);
+        
+        // Show success snackbar and navigate to map
+        setSnackbarMessage('🌍 New location added to your journey!');
+        setSnackbarVisible(true);
+        navigation.goBack();
+      }
     } catch (error) {
       console.error('Error saving location:', error);
       Alert.alert('Error', 'Failed to save location. Please try again.');
@@ -120,151 +159,165 @@ const AddLocationScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      <Title style={styles.title}>Add New Location</Title>
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+        <Title style={styles.title}>{isEditing ? 'Edit Location' : 'Add New Location'}</Title>
 
-      {/* Quick current location option */}
-      <View style={styles.quickActions}>
+        {/* Quick current location option */}
+        <View style={styles.quickActions}>
+          <Button
+            mode="outlined"
+            onPress={handleUseCurrentLocation}
+            loading={isLoadingLocation}
+            icon="crosshairs-gps"
+            style={styles.quickButton}
+          >
+            Use Current Location
+          </Button>
+        </View>
+
+        {/* Location search with autocomplete */}
+        <View style={styles.autocompleteContainer}>
+          <LocationAutocomplete
+            placeholder="Search for a location (e.g., 'Ber...' for Berlin)"
+            onLocationSelect={handleLocationSelect}
+            disabled={isLoadingLocation}
+          />
+        </View>
+
+        {/* Show selected location details */}
+        {selectedLocation && (
+          <View style={styles.selectedLocationContainer}>
+            <Title style={styles.selectedLocationTitle}>Selected Location:</Title>
+            <Chip 
+              icon="location-on" 
+              mode="outlined"
+              style={styles.locationChip}
+            >
+              {selectedLocation.city || selectedLocation.country}
+            </Chip>
+            <View style={styles.locationDetails}>
+              {selectedLocation.city && (
+                <TextInput
+                  label="City"
+                  value={formData.city}
+                  onChangeText={(text) => setFormData({ ...formData, city: text })}
+                  style={styles.input}
+                  mode="outlined"
+                />
+              )}
+              {selectedLocation.region && (
+                <TextInput
+                  label="Region/State"
+                  value={formData.region}
+                  onChangeText={(text) => setFormData({ ...formData, region: text })}
+                  style={styles.input}
+                  mode="outlined"
+                />
+              )}
+              <TextInput
+                label="Country"
+                value={formData.country}
+                onChangeText={(text) => setFormData({ ...formData, country: text })}
+                style={styles.input}
+                mode="outlined"
+              />
+            </View>
+          </View>
+        )}
+
+        {/* Visit date */}
         <Button
           mode="outlined"
-          onPress={handleUseCurrentLocation}
-          loading={isLoadingLocation}
-          icon="crosshairs-gps"
-          style={styles.quickButton}
+          onPress={() => setShowDatePicker(true)}
+          style={styles.input}
+          icon="calendar"
         >
-          Use Current Location
+          Visit Date: {formData.visitDate
+            ? formData.visitDate.toLocaleDateString()
+            : 'Select Date'}
         </Button>
-      </View>
 
-      {/* Location search with autocomplete */}
-      <View style={styles.autocompleteContainer}>
-        <LocationAutocomplete
-          placeholder="Search for a location (e.g., 'Ber...' for Berlin)"
-          onLocationSelect={handleLocationSelect}
-          disabled={isLoadingLocation}
-        />
-      </View>
+        {showDatePicker && (
+          <DateTimePicker
+            value={formData.visitDate || new Date()}
+            mode="date"
+            onChange={handleDateChange}
+            maximumDate={new Date()}
+          />
+        )}
 
-      {/* Show selected location details */}
-      {selectedLocation && (
-        <View style={styles.selectedLocationContainer}>
-          <Title style={styles.selectedLocationTitle}>Selected Location:</Title>
-          <Chip 
-            icon="location-on" 
-            mode="outlined"
-            style={styles.locationChip}
-          >
-            {selectedLocation.city || selectedLocation.country}
-          </Chip>
-          <View style={styles.locationDetails}>
-            {selectedLocation.city && (
-              <TextInput
-                label="City"
-                value={formData.city}
-                onChangeText={(text) => setFormData({ ...formData, city: text })}
-                style={styles.input}
-                mode="outlined"
-              />
-            )}
-            {selectedLocation.region && (
-              <TextInput
-                label="Region/State"
-                value={formData.region}
-                onChangeText={(text) => setFormData({ ...formData, region: text })}
-                style={styles.input}
-                mode="outlined"
-              />
-            )}
-            <TextInput
-              label="Country"
-              value={formData.country}
-              onChangeText={(text) => setFormData({ ...formData, country: text })}
-              style={styles.input}
-              mode="outlined"
-            />
-          </View>
-        </View>
-      )}
-
-      {/* Visit date */}
-      <Button
-        mode="outlined"
-        onPress={() => setShowDatePicker(true)}
-        style={styles.input}
-        icon="calendar"
-      >
-        Visit Date: {formData.visitDate
-          ? formData.visitDate.toLocaleDateString()
-          : 'Select Date'}
-      </Button>
-
-      {showDatePicker && (
-        <DateTimePicker
-          value={formData.visitDate || new Date()}
-          mode="date"
-          onChange={handleDateChange}
-          maximumDate={new Date()}
-        />
-      )}
-
-      {/* Notes */}
-      <TextInput
-        label="Notes (Optional)"
-        value={formData.notes}
-        onChangeText={(text) => setFormData({ ...formData, notes: text })}
-        style={styles.input}
-        mode="outlined"
-        multiline
-        numberOfLines={3}
-        placeholder="What made this place special? Any memories to remember?"
-      />
-
-      {/* Photo */}
-      <Button
-        mode="outlined"
-        onPress={handleSelectPhoto}
-        style={styles.input}
-        icon="camera"
-      >
-        {photoUri ? 'Change Photo' : 'Add Photo (Optional)'}
-      </Button>
-
-      {/* Show coordinates if available */}
-      {formData.coordinates && formData.coordinates.latitude !== 0 && (
-        <View style={styles.coordinatesContainer}>
-          <Chip icon="my-location" mode="outlined">
-            {formData.coordinates.latitude.toFixed(4)}, {formData.coordinates.longitude.toFixed(4)}
-          </Chip>
-        </View>
-      )}
-
-      {/* Submit button */}
-      <Button
-        mode="contained"
-        onPress={handleSubmit}
-        style={styles.submitButton}
-        disabled={!selectedLocation || !formData.country || isSaving}
-        loading={isSaving}
-      >
-        {isSaving ? 'Saving...' : 'Save Location'}
-      </Button>
-
-      {/* Instructions */}
-      <View style={styles.instructionsContainer}>
-        <Title style={styles.instructionsTitle}>How to use:</Title>
+        {/* Notes */}
         <TextInput
+          label="Notes (Optional)"
+          value={formData.notes}
+          onChangeText={(text) => setFormData({ ...formData, notes: text })}
+          style={styles.input}
           mode="outlined"
-          value="1. Search for your location (e.g., 'Berlin', 'Paris', 'Tokyo')
+          multiline
+          numberOfLines={3}
+          placeholder="What made this place special? Any memories to remember?"
+        />
+
+        {/* Photo */}
+        <Button
+          mode="outlined"
+          onPress={handleSelectPhoto}
+          style={styles.input}
+          icon="camera"
+        >
+          {photoUri ? 'Change Photo' : 'Add Photo (Optional)'}
+        </Button>
+
+        {/* Show coordinates if available */}
+        {formData.coordinates && formData.coordinates.latitude !== 0 && (
+          <View style={styles.coordinatesContainer}>
+            <Chip icon="my-location" mode="outlined">
+              {formData.coordinates.latitude.toFixed(4)}, {formData.coordinates.longitude.toFixed(4)}
+            </Chip>
+          </View>
+        )}
+
+        {/* Submit button */}
+        <Button
+          mode="contained"
+          onPress={handleSubmit}
+          style={styles.submitButton}
+          contentStyle={styles.submitButtonContent}
+          labelStyle={styles.submitButtonLabel}
+          disabled={!selectedLocation || !formData.country || isSaving}
+          loading={isSaving}
+        >
+          {isSaving ? 'Saving...' : (isEditing ? 'Update Location' : 'Save Location')}
+        </Button>
+
+        {/* Instructions */}
+        <View style={styles.instructionsContainer}>
+          <Title style={styles.instructionsTitle}>How to use:</Title>
+          <TextInput
+            mode="outlined"
+            value="1. Search for your location (e.g., 'Berlin', 'Paris', 'Tokyo')
 2. Select from suggestions - all fields auto-fill
 3. Adjust details if needed
 4. Add visit date and notes
 5. Save to your travel log!"
-          multiline
-          editable={false}
-          style={styles.instructions}
-        />
-      </View>
-    </ScrollView>
+            multiline
+            editable={false}
+            style={styles.instructions}
+          />
+        </View>
+      </ScrollView>
+      
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={1500}
+        style={styles.snackbar}
+        wrapperStyle={styles.snackbarWrapper}
+      >
+        {snackbarMessage}
+      </Snackbar>
+    </View>
   );
 };
 
@@ -273,6 +326,9 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: '#F8F9FA',
+  },
+  scrollContainer: {
+    flex: 1,
   },
   title: {
     fontSize: 28,
@@ -345,6 +401,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
+  submitButtonContent: {
+    paddingVertical: 4,
+  },
+  submitButtonLabel: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   instructionsContainer: {
     marginBottom: 24,
     padding: 20,
@@ -364,6 +428,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: '#1A1A1A',
+  },
+  snackbar: {
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginBottom: 20,
+  },
+  snackbarWrapper: {
+    zIndex: 1000,
   },
 });
 
